@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تتبع الحساب</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #f4f6f8;
+  margin: 0;
+  padding: 10px;
+}
+
+h2 {
+  text-align: center;
+}
+
+.total {
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.card {
+  background: #fff;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.header {
+  background: #007bff;
+  color: white;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.name {
+  flex: 1;
+  text-align: right;
+}
+
+.sep {
+  margin: 0 10px;
+  opacity: 0.8;
+}
+
+.sum {
+  flex: 1;
+  text-align: left;
+}
+
+.content {
+  display: none;
+  padding: 10px;
+}
+
+.op {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+input {
+  width: 100%;
+  padding: 7px;
+  margin: 3px 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+}
+
+.add {
+  background: #007bff;
+  color: white;
+  margin-top: 5px;
+}
+
+.del {
+  background: red;
+  color: white;
+}
+
+.del-person {
+  background: darkred;
+  color: white;
+  margin-top: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📊 تتبع الحساب</h2>
+
+<div class="total">
+الرصيد الإجمالي: <span id="total">0 د.م</span>
+</div>
+
+<div id="container"></div>
+
+<button class="add" onclick="addPerson()">➕ إضافة مستفيد</button>
+
+<script>
+
+/* 🔔 إشعار */
+function sendNotification(title, body) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body });
+  }
+}
+
+/* 📊 الحساب */
+function calculate() {
+
+  let cards = document.querySelectorAll(".card");
+  let total = 0;
+
+  let data = [];
+
+  cards.forEach(c => {
+
+    let name = c.querySelector("input").value;
+    let ops = c.querySelectorAll(".op");
+
+    let personTotal = 0;
+    let personOps = [];
+
+    ops.forEach(op => {
+      let inputs = op.querySelectorAll("input");
+
+      let amount = Number(inputs[1].value) || 0;
+
+      personTotal += amount;
+      total += amount;
+
+      personOps.push({
+        date: inputs[0].value,
+        amount,
+        withdrawDate: inputs[2].value
+      });
+    });
+
+    c.querySelector(".sum").innerText = personTotal + " د.م";
+    c.querySelector(".name").innerText = name || "بدون اسم";
+
+    data.push({ name, ops: personOps });
+  });
+
+  document.getElementById("total").innerText = total.toFixed(2) + " د.م";
+
+  localStorage.setItem("data", JSON.stringify(data));
+}
+
+/* 👤 إضافة مستفيد */
+function addPerson(data = {}) {
+
+  let container = document.getElementById("container");
+
+  let card = document.createElement("div");
+  card.className = "card";
+
+  card.innerHTML = `
+    <div class="header">
+      <div class="name"></div>
+      <div class="sep">:</div>
+      <div class="sum">0 د.م</div>
+    </div>
+
+    <div class="content">
+
+      <input type="text" placeholder="اسم المستفيد"
+        style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd;text-align:center;">
+
+      <div class="ops"></div>
+
+      <button onclick="addOp(this)">➕ إضافة عملية</button>
+
+      <!-- 🔥 زر الحذف مصحح -->
+      <button class="del-person" onclick="deletePerson(this)">❌ حذف المستفيد</button>
+
+    </div>
+  `;
+
+  container.appendChild(card);
+
+  let header = card.querySelector(".header");
+  let nameDiv = card.querySelector(".name");
+  let nameInput = card.querySelector("input");
+  let content = card.querySelector(".content");
+  let ops = card.querySelector(".ops");
+
+  nameInput.value = data.name || "";
+
+  function updateName() {
+    nameDiv.innerText = nameInput.value.trim() || "بدون اسم";
+  }
+
+  updateName();
+
+  nameInput.oninput = () => {
+    updateName();
+    calculate();
+  };
+
+  header.onclick = () => {
+    content.style.display =
+      content.style.display === "block" ? "none" : "block";
+  };
+
+  if (data.ops) {
+    data.ops.forEach(o => addOp(null, ops, o));
+  } else {
+    addOp(null, ops);
+  }
+
+  calculate();
+}
+
+/* ➕ إضافة عملية */
+function addOp(btn, container = null, data = {}) {
+
+  if (!container) {
+    container = btn.parentElement.querySelector(".ops");
+  }
+
+  let div = document.createElement("div");
+  div.className = "op";
+
+  div.innerHTML = `
+    <input type="text" placeholder="تاريخ"
+      onfocus="this.type='date'"
+      onblur="if(!this.value)this.type='text'">
+
+    <input type="number" placeholder="المبلغ">
+
+    <input type="text" placeholder="تاريخ السحب"
+      onfocus="this.type='date'"
+      onblur="if(!this.value)this.type='text'">
+
+    <button class="del" onclick="deleteOp(this)">حذف ❌</button>
+  `;
+
+  container.appendChild(div);
+
+  let inputs = div.querySelectorAll("input");
+
+  inputs[0].value = data.date || new Date().toISOString().split('T')[0];
+  inputs[1].value = data.amount || "";
+  inputs[2].value = data.withdrawDate || "";
+
+  inputs.forEach(i => i.oninput = calculate);
+
+  calculate();
+}
+
+/* ❌ حذف عملية */
+function deleteOp(btn) {
+  let op = btn.closest(".op");
+  if (op) {
+    op.remove();
+    calculate();
+  }
+}
+
+/* ❌ حذف مستفيد (حل Sketchware) */
+function deletePerson(btn) {
+  if (confirm("⚠️ واش متأكد بغيتي تحذف هاد المستفيد؟")) {
+    let card = btn.closest(".card");
+    if (card) {
+      card.remove();
+      calculate();
+    }
+  }
+}
+
+/* 🚀 تشغيل */
+window.onload = function () {
+
+  if ("Notification" in window) {
+    Notification.requestPermission();
+  }
+
+  let saved = JSON.parse(localStorage.getItem("data") || "[]");
+
+  if (saved.length === 0) {
+    addPerson();
+  } else {
+    saved.forEach(p => addPerson(p));
+  }
+};
+
+</script>
+
+</body>
+</html>
